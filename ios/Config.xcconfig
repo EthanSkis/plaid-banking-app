@@ -1,6 +1,6 @@
 // Shared settings. Personal values go in Local.xcconfig (gitignored).
 PRODUCT_BUNDLE_IDENTIFIER = com.ethanskis.plaidbank
 DEVELOPMENT_TEAM =
-API_HOST = your-backend.vercel.app
+API_HOST = plaid-banking-app.vercel.app
 
 #include? "Local.xcconfig"

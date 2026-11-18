@@ -21,37 +21,23 @@ The Plaid secret and access tokens only ever exist on the server. The app only h
 
 ## Setup
 
-### 1. Database (Neon via Vercel)
+### 1. Backend (already done: Vercel project `plaid-banking-app`, live at https://plaid-banking-app.vercel.app)
 
-1. Create a Vercel project from this repo with **Root Directory = `backend`**.
-2. In the project: Storage → Create → **Neon** (Postgres). This sets `DATABASE_URL` for you.
-3. Apply the schema once from your Mac:
-   ```bash
-   cd backend && npm install
-   DATABASE_URL='<paste from Vercel>' npm run migrate
-   ```
+Still needed in the Vercel dashboard:
 
-### 2. Backend env vars (Vercel → Settings → Environment Variables)
+1. **Storage → Create Database → Neon** and connect it to the project. This sets `DATABASE_URL`.
+2. **Settings → Environment Variables:** add `PLAID_CLIENT_ID` and `PLAID_SECRET` (Sandbox secret) for Production + Preview.
+3. **Deployments → latest → Redeploy.** The build applies `db/schema.sql` automatically (`vercel-build` script), so there's no manual migration.
 
-See `backend/.env.example`. Generate the three secrets with `openssl rand -base64 32`.
+Already set: `PLAID_ENV=sandbox`, `APPLE_BUNDLE_ID`, `ENCRYPTION_KEY`, `SESSION_SECRET`, `CRON_SECRET`.
+**Back up `ENCRYPTION_KEY`** somewhere safe (password manager). Lose it and every bank must be relinked.
 
-| Var | Value |
-|---|---|
-| `PLAID_CLIENT_ID` / `PLAID_SECRET` | Plaid dashboard → Developers → Keys |
-| `PLAID_ENV` | `sandbox` (later `production`) |
-| `ENCRYPTION_KEY` | 32 random bytes, base64. **Back this up.** Lose it and every bank must be relinked. |
-| `SESSION_SECRET` | random |
-| `CRON_SECRET` | random (Vercel uses it to authenticate the daily cron) |
-| `APPLE_BUNDLE_ID` | your iOS bundle id, e.g. `com.ethanskis.plaidbank` |
-
-Redeploy after setting them.
-
-### 3. iOS app
+### 2. iOS app
 
 ```bash
 brew install xcodegen
 cd ios
-cp Local.xcconfig.example Local.xcconfig   # set bundle id, team id, API_HOST (host only, no https://)
+cp Local.xcconfig.example Local.xcconfig   # set DEVELOPMENT_TEAM (your Apple team ID)
 xcodegen
 open PlaidBank.xcodeproj
 ```
@@ -60,7 +46,7 @@ In Xcode, make sure your team is selected under Signing & Capabilities (Sign in 
 
 The bundle id in `Local.xcconfig` must exactly match `APPLE_BUNDLE_ID` on the backend, or sign-in fails with 401.
 
-### 4. Try it in Sandbox
+### 3. Try it in Sandbox
 
 Connect a bank → pick any institution (e.g. "First Platypus Bank") → username `user_transactions_dynamic`, password `anything`. That test user has realistic recurring transactions so the subscriptions tab has something to find.
 

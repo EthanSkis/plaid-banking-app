@@ -1,4 +1,4 @@
 // Copy to Local.xcconfig and fill in. Host only, no https:// (// starts a comment in xcconfig files).
 PRODUCT_BUNDLE_IDENTIFIER = com.ethanskis.plaidbank
 DEVELOPMENT_TEAM = ABCDE12345
-API_HOST = your-backend.vercel.app
+API_HOST = plaid-banking-app.vercel.app
