@@ -532,7 +532,7 @@
     /* Right column: sized by the left one (contain: size), Activity fills what's left with whole rows */
     #pBanking.fit { contain: size; }
     /* Accounts take what they need; with many accounts they scroll inside their own area */
-    .accts { flex: 0 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--raised) transparent; }
+    .accts { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
     .accts.more-below { -webkit-mask: linear-gradient(#000 calc(100% - 56px), transparent);
                                 mask: linear-gradient(#000 calc(100% - 56px), transparent); }
     /* Activity takes the rest, in whole rows */
@@ -545,6 +545,30 @@
                 transition: background-color 150ms var(--ease), color 150ms var(--ease); }
     .row.foot:hover { background: var(--raised); color: var(--text); }
     .row.foot svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; }
+  }
+
+  /* ===================== Scrollbars: thin, warm, no arrows, clear of rounded corners ===================== */
+  :root { --sb-thumb: rgba(239, 233, 222, .16); --sb-thumb-hover: rgba(239, 233, 222, .32); }
+  html::-webkit-scrollbar, .act-body::-webkit-scrollbar, .accts::-webkit-scrollbar, .sheet::-webkit-scrollbar, .sb-probe::-webkit-scrollbar { width: 12px; height: 12px; }
+  html::-webkit-scrollbar-track, .act-body::-webkit-scrollbar-track, .accts::-webkit-scrollbar-track, .sheet::-webkit-scrollbar-track { background: transparent; }
+  html::-webkit-scrollbar-thumb, .act-body::-webkit-scrollbar-thumb, .accts::-webkit-scrollbar-thumb, .sheet::-webkit-scrollbar-thumb {
+    min-height: 40px; border: 4px solid transparent; border-radius: 6px; background: var(--sb-thumb) padding-box; }
+  html::-webkit-scrollbar-thumb:hover, .act-body::-webkit-scrollbar-thumb:hover, .accts::-webkit-scrollbar-thumb:hover, .sheet::-webkit-scrollbar-thumb:hover { background-color: var(--sb-thumb-hover); }
+  html::-webkit-scrollbar-button, .act-body::-webkit-scrollbar-button, .accts::-webkit-scrollbar-button, .sheet::-webkit-scrollbar-button,
+  html::-webkit-scrollbar-corner, .act-body::-webkit-scrollbar-corner, .accts::-webkit-scrollbar-corner { display: none; width: 0; height: 0; background: transparent; }
+  .act-body::-webkit-scrollbar-track { margin: 4px 0 16px; }   /* stay clear of the panel's rounded bottom corners */
+  @supports not selector(::-webkit-scrollbar) {
+    html, .act-body, .accts, .sheet { scrollbar-width: thin; scrollbar-color: var(--sb-thumb) transparent; }
+  }
+  .sb-probe { position: absolute; top: -9999px; width: 100px; height: 50px; overflow: scroll; }
+
+  /* The scrollbar's width comes out of the padding, so rows line up with the search box above.
+     --sbw is measured at startup: 12px with classic scrollbars, 0 with overlay ones (phones, macOS default). */
+  .act-body { scrollbar-gutter: stable; padding-right: max(4px, calc(16px - var(--sbw, 0px))); }
+  @media (min-width: 960px) {
+    .act-body { padding-right: max(4px, calc(24px - var(--sbw, 0px))); }
+    /* Accounts: the scrollbar sits in the page margin, so the cards keep the column's full width */
+    .accts { scrollbar-gutter: stable; margin-right: calc(-1 * var(--sbw, 0px)); }
   }
 </style>
 </head>
@@ -732,6 +756,9 @@ $("logoutBtn").onclick = signOut;
 
 // ---------- Pager ----------
 const pager = $("pager"), pages = [$("pBanking"), $("pNet")], dots = [...document.querySelectorAll(".dots button")];
+// Measure the styled scrollbar once (0 on devices with overlay scrollbars)
+(() => { const d = document.createElement("div"); d.className = "sb-probe"; document.body.append(d);
+         document.documentElement.style.setProperty("--sbw", d.offsetWidth - d.clientWidth + "px"); d.remove(); })();
 const reduceMQ = matchMedia("(prefers-reduced-motion: reduce)"), wideMQ = matchMedia("(min-width: 960px)");
 function setPage(i) { pager.scrollTo({ left: i * pager.clientWidth, behavior: reduceMQ.matches ? "auto" : "smooth" }); }
 dots.forEach((d) => (d.onclick = () => setPage(+d.dataset.page)));
