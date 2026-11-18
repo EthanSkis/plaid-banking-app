@@ -301,7 +301,6 @@
 
   .fade-in { animation: fadeIn .6s ease both; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } }
-  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
   /* ===================== unslop pass (polish mode) =====================
      Rules: unslop by Damir Sokolovsky (@heydamir), CC BY 4.0 */
@@ -331,7 +330,7 @@
   .dots button.on { transform: none; background: var(--text); }
 
   /* Spacing on the 4px grid */
-  .page { padding: 96px 16px 48px; transition: opacity 300ms var(--ease); }
+  .page { padding: 96px 16px 48px; }   /* opacity follows the swipe directly, see syncPager() */
   .page.away { filter: none; }
   .hero { padding: 24px 0 8px; }
   .amount { margin: 8px 0; letter-spacing: -.02em; }
@@ -469,6 +468,52 @@
     .bank-hero .amount { font-size: 32px; letter-spacing: 0; }
     .sheet { padding: 24px; border-radius: 0; }
   }
+
+  /* ===================== Motion =====================
+     Apple HIG: purposeful, brief, follows the gesture, interruptible, optional (Reduce Motion) */
+
+  /* Press feedback: short and precise, no bounce */
+  .btn, .btn-sm, .action { transition: transform 120ms var(--ease), background-color 150ms var(--ease); }
+  .btn:active, .btn-sm:active, .action:active { transform: scale(.98); }
+  .link, .more { transition: opacity 120ms var(--ease); }
+  .link:active, .more:active { opacity: .6; }
+
+  /* Sheets you can grab: a bigger hit area on the handle, no transition while a finger is on it */
+  .grabber { box-sizing: content-box; padding: 12px 45%; margin: -12px auto 4px; background-clip: content-box; touch-action: none; cursor: grab; }
+  .dragging { transition: none !important; }
+
+  /* Activity on phones: a real sheet that slides up from the bottom and drags back down */
+  @media (max-width: 959px) {
+    .act { opacity: 1; transform: translateY(100%); transition: transform 400ms var(--ease), visibility 0s linear 400ms; }
+    .act-open .act { transform: none; transition: transform 400ms var(--ease); }
+    .act-head { position: relative; touch-action: none; padding-top: max(24px, env(safe-area-inset-top)); }
+    .act-head::before { content: ""; position: absolute; top: 8px; left: 50%; width: 40px; height: 4px; margin-left: -20px;
+                        border-radius: 2px; background: var(--raised); }
+  }
+  /* Activity on desktop: a window that settles into place */
+  @media (min-width: 960px) {
+    .act { transform: translate(-50%, -50%) scale(.98);
+           transition: opacity 200ms var(--ease), transform 250ms var(--ease), visibility 0s linear 250ms; }
+    .act-open .act { transform: translate(-50%, -50%); transition: opacity 200ms var(--ease), transform 250ms var(--ease); }
+  }
+
+  /* Changing chart range: a quick crossfade, not a replay of the 900ms draw-in */
+  .chart svg.swap { animation: chartIn 180ms var(--ease) both; }
+  @keyframes chartIn { from { opacity: 0; } }
+
+  /* Reduce Motion: keep feedback, swap movement for crossfades */
+  @media (prefers-reduced-motion: reduce) {
+    #app:not(.hidden) .pager, .fade-in, .chart svg.swap { animation: none; }
+    .btn:active, .btn-sm:active, .action:active, .round:active { transform: none; }
+    .toast, .toast.show { transform: translate(-50%, 0); }
+    .sheet, .open .sheet { transform: none; }
+    .sheet { opacity: 0; visibility: hidden; transition: opacity 200ms var(--ease), visibility 0s linear 200ms; }
+    .open .sheet { opacity: 1; visibility: visible; transition: opacity 200ms var(--ease); }
+    .act { opacity: 0; transition: opacity 200ms var(--ease), visibility 0s linear 200ms; }
+    .act-open .act { opacity: 1; transition: opacity 200ms var(--ease); }
+  }
+  @media (prefers-reduced-motion: reduce) and (max-width: 959px) { .act, .act-open .act { transform: none; } }
+  @media (prefers-reduced-motion: reduce) and (min-width: 960px) { .act, .act-open .act { transform: translate(-50%, -50%); } }
 </style>
 </head>
 <body>
@@ -651,15 +696,23 @@ $("logoutBtn").onclick = signOut;
 
 // ---------- Pager ----------
 const pager = $("pager"), pages = [$("pBanking"), $("pNet")], dots = [...document.querySelectorAll(".dots button")];
-function setPage(i) { pager.scrollTo({ left: i * pager.clientWidth, behavior: "smooth" }); }
+const reduceMQ = matchMedia("(prefers-reduced-motion: reduce)"), wideMQ = matchMedia("(min-width: 960px)");
+function setPage(i) { pager.scrollTo({ left: i * pager.clientWidth, behavior: reduceMQ.matches ? "auto" : "smooth" }); }
 dots.forEach((d) => (d.onclick = () => setPage(+d.dataset.page)));
-pager.addEventListener("scroll", () => {
-  const i = Math.round(pager.scrollLeft / pager.clientWidth);
+// The leaving page dims in step with the finger instead of flipping at the halfway point
+function syncPager() {
+  if (wideMQ.matches) { pages.forEach((p) => (p.style.opacity = "")); return; }
+  const prog = pager.scrollLeft / (pager.clientWidth || 1);
+  pages.forEach((p, j) => (p.style.opacity = String(1 - 0.75 * Math.min(1, Math.abs(j - prog)))));
+  const i = Math.round(prog);
   dots.forEach((d, j) => d.classList.toggle("on", i === j));
   pages.forEach((p, j) => p.classList.toggle("away", i !== j));
-}, { passive: true });
+}
+pager.addEventListener("scroll", syncPager, { passive: true });
+wideMQ.addEventListener("change", syncPager);
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && document.body.classList.contains("act-open")) return closeActivity();
+  if (e.key === "Escape" && $("shell").classList.contains("open")) return closeSheet();
   if (e.target.tagName === "INPUT" || document.body.classList.contains("act-open")) return;
   if (e.key === "ArrowRight") setPage(1);
   if (e.key === "ArrowLeft") setPage(0);
@@ -670,6 +723,34 @@ function openSheet() { $("shell").classList.add("open"); }
 function closeSheet() { $("shell").classList.remove("open"); }
 $("menuBtn").onclick = openSheet;
 $("scrim").onclick = closeSheet;
+
+// Drag a sheet down to dismiss it. It tracks the finger 1:1, and a short flick is enough.
+function dragToDismiss(panel, handle, scrim, isOpen, close) {
+  let y0 = null, dy = 0, v = 0, lastY = 0, lastT = 0;
+  handle.addEventListener("pointerdown", (e) => {
+    if (wideMQ.matches || !isOpen() || e.button > 0 || e.target.closest("button, input")) return;
+    y0 = lastY = e.clientY; lastT = e.timeStamp; dy = 0; v = 0;
+    handle.setPointerCapture(e.pointerId);
+    panel.classList.add("dragging"); scrim.classList.add("dragging");
+  });
+  handle.addEventListener("pointermove", (e) => {
+    if (y0 == null) return;
+    dy = Math.max(0, e.clientY - y0);
+    const dt = e.timeStamp - lastT; if (dt > 0) v = (e.clientY - lastY) / dt;
+    lastY = e.clientY; lastT = e.timeStamp;
+    panel.style.transform = `translateY(${dy}px)`;
+    scrim.style.opacity = String(Math.max(0, 1 - dy / panel.offsetHeight));
+  });
+  const end = () => {
+    if (y0 == null) return; y0 = null;
+    panel.classList.remove("dragging"); scrim.classList.remove("dragging");
+    panel.style.transform = ""; scrim.style.opacity = "";   // the CSS transition picks up from where the finger let go
+    if (dy > panel.offsetHeight * 0.25 || v > 0.5) close();
+  };
+  handle.addEventListener("pointerup", end);
+  handle.addEventListener("pointercancel", end);
+}
+dragToDismiss($("sheet"), document.querySelector("#sheet .grabber"), $("scrim"), () => $("shell").classList.contains("open"), closeSheet);
 
 // ---------- Data ----------
 async function loadAll() {
@@ -736,14 +817,14 @@ async function loadAccounts() {
   $("otherWrap").classList.toggle("hidden", !other.children.length);
   if (!n) cash.append(el("div", "empty", "No accounts yet. Tap Add to connect a bank."));
 
-  $("cashTotal").textContent = usd(cashTotal);
+  setMoney($("cashTotal"), cashTotal, true);
   const synced = items.map((b) => b.lastSyncedAt).filter(Boolean).sort().pop();
   $("cashSub").textContent = n
     ? `${n} account${n === 1 ? "" : "s"}${synced ? " · Updated " + timeAgo(synced) : ""}`
     : "Connect a bank to get started";
 
-  $("assets").textContent = usd(assets);
-  $("liabs").textContent = usd(liabs);
+  setMoney($("assets"), assets, true);
+  setMoney($("liabs"), liabs, true);
   $("ratioA").style.flexGrow = assets || 1;
   $("ratioL").style.flexGrow = liabs;
   state.nwNow = assets - liabs;
@@ -802,8 +883,20 @@ function rangeSeries() {
 
 const RANGE_LABEL = { "7": "past week", "30": "past month", "90": "past 3 months", ytd: "this year", "365": "past year", all: "all time" };
 
-function setHeader(value, change, label) {
-  $("nwTotal").textContent = usd(value);
+function setMoney(node, value, animate) {
+  const from = node._v; node._v = value; cancelAnimationFrame(node._raf);
+  if (!animate || from == null || Math.abs(from - value) < 0.005 || reduceMQ.matches) { node.textContent = usd(value); return; }
+  const t0 = performance.now(), dur = 500;
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / dur), eased = 1 - Math.pow(1 - k, 3);
+    node.textContent = usd(from + (value - from) * eased);
+    if (k < 1) node._raf = requestAnimationFrame(step);
+  };
+  node._raf = requestAnimationFrame(step);
+}
+
+function setHeader(value, change, label, animate = false) {
+  setMoney($("nwTotal"), value, animate);
   const sub = $("nwChange"); sub.replaceChildren();
   if (change == null) { sub.textContent = label || ""; return; }
   const tri = el("span", "tri " + (change.abs >= 0 ? "up" : "down"));
@@ -816,9 +909,9 @@ function renderNetWorth() {
   const now = state.nwNow ?? (pts.length ? pts[pts.length - 1].netWorth : 0);
   if (pts.length >= 2) {
     const first = pts[0].netWorth;
-    setHeader(now, { abs: now - first, base: first }, RANGE_LABEL[state.range]);
+    setHeader(now, { abs: now - first, base: first }, RANGE_LABEL[state.range], true);
   } else {
-    setHeader(now, null, state.series.length ? "History builds day by day" : "");
+    setHeader(now, null, state.series.length ? "History builds day by day" : "", true);
   }
   drawChart(pts);
   const est = pts.filter((p) => p.estimated);
@@ -833,7 +926,7 @@ document.querySelectorAll("#ranges button").forEach((b) => (b.onclick = () => {
   state.range = b.dataset.r; renderNetWorth();
 }));
 
-function drawChart(pts, animate = true) {
+function drawChart(pts, mode = "auto") {   // "auto": draw in the first time, crossfade after; "none": no motion
   const box = $("chart"); box.replaceChildren();
   if (pts.length < 2) {
     box.append(el("div", "empty-chart", state.series.length
@@ -884,12 +977,14 @@ function drawChart(pts, animate = true) {
 
   // Draw-on animation
   const line = svg.querySelector("#line"), len = line.getTotalLength?.() || 0;
-  if (animate && len && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  if (mode === "auto" && state.chartIntroDone) svg.classList.add("swap");
+  if (mode === "auto" && !state.chartIntroDone && len && !reduceMQ.matches) {
     line.style.strokeDasharray = len; line.style.strokeDashoffset = len;
     line.getBoundingClientRect();
     line.style.transition = "stroke-dashoffset 900ms cubic-bezier(.22,1,.36,1)";
     line.style.strokeDashoffset = 0;
   }
+  if (mode === "auto") state.chartIntroDone = true;
 
   // Scrub: hover/drag to see the value on a given day
   const cursor = svg.querySelector("#cursor"), cl = svg.querySelector("#cl"), cd = svg.querySelector("#cd");
@@ -915,7 +1010,7 @@ function renderNetWorthHeaderOnly() {
 }
 
 let resizeT;
-addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => drawChart(rangeSeries(), false), 150); });
+addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => drawChart(rangeSeries(), "none"), 150); });
 
 // ---------- Transactions ----------
 function logoFor(t) {
@@ -1012,6 +1107,7 @@ function closeActivity() {
   $("seeAll").focus();
 }
 $("seeAll").onclick = openActivity;
+dragToDismiss($("act"), document.querySelector("#act .act-head"), $("actScrim"), () => document.body.classList.contains("act-open"), closeActivity);
 $("actClose").onclick = closeActivity;
 $("actScrim").onclick = closeActivity;
 
@@ -1061,7 +1157,11 @@ $("refreshBtn").onclick = async () => {
   b.classList.add("spinning");
   try { await api("POST", "/api/sync"); await loadAll(); toast("Up to date"); }
   catch (e) { toast(e.message); }
-  finally { b.classList.remove("spinning"); }
+  finally {
+    const stop = () => b.classList.remove("spinning");
+    if (reduceMQ.matches) stop();
+    else { b.querySelector("svg").addEventListener("animationiteration", stop, { once: true }); setTimeout(stop, 1000); }
+  }
 };
 
 async function openLink(itemId) {
