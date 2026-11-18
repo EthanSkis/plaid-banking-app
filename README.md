@@ -19,6 +19,12 @@ Vercel Cron (daily) ──▶ /api/cron/daily ──▶ sync every bank + snapsh
 
 The Plaid secret and access tokens only ever exist on the server. The app only holds its own session token.
 
+## Web app (quickest way to use it)
+
+https://plaid-banking-app.vercel.app is a single-page web version (`backend/public/index.html`) using the same API.
+It logs in with a password instead of Sign in with Apple: set `APP_PASSWORD` in Vercel (use a long one) and redeploy.
+The web login is its own user, so banks linked on the web don't show up in the iOS app and vice versa.
+
 ## Setup
 
 ### 1. Backend (already done: Vercel project `plaid-banking-app`, live at https://plaid-banking-app.vercel.app)
@@ -26,7 +32,7 @@ The Plaid secret and access tokens only ever exist on the server. The app only h
 Still needed in the Vercel dashboard:
 
 1. **Storage → Create Database → Neon** and connect it to the project. This sets `DATABASE_URL`.
-2. **Settings → Environment Variables:** add `PLAID_CLIENT_ID` and `PLAID_SECRET` (Sandbox secret) for Production + Preview.
+2. **Settings → Environment Variables:** add `PLAID_CLIENT_ID`, `PLAID_SECRET` (Sandbox secret), and `APP_PASSWORD` (web login) for Production + Preview.
 3. **Deployments → latest → Redeploy.** The build applies `db/schema.sql` automatically (`vercel-build` script), so there's no manual migration.
 
 Already set: `PLAID_ENV=sandbox`, `APPLE_BUNDLE_ID`, `ENCRYPTION_KEY`, `SESSION_SECRET`, `CRON_SECRET`.
