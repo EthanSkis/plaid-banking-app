@@ -241,6 +241,64 @@
            font-size: 14px; max-width: calc(100% - 32px); transition: opacity .25s, transform .25s; pointer-events: none; }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+  /* New bits shared by both layouts */
+  .brand, .btn-sm { display: none; }
+  .nw-foot .panel { margin-top: 22px; }
+  .note { margin-top: 12px; text-align: center; color: var(--dim); font-size: 12.5px; }
+
+  /* ---------- Desktop dashboard ---------- */
+  @media (min-width: 1100px) {
+    body { overflow: auto; background-attachment: fixed; }
+    .shell { max-width: 1320px; height: auto; min-height: 100vh; margin: 0 auto; padding: 0 36px 64px;
+             border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
+    .shell::before { position: fixed; }
+    #app { height: auto !important; }
+    .topbar { position: sticky; padding: 20px 0 18px; gap: 12px;
+              background: linear-gradient(180deg, #0b0a09 0 70%, rgba(11,10,9,0)); }
+    .brand { display: flex; align-items: center; gap: 12px; margin-right: auto; font-size: 20px; letter-spacing: -.01em; }
+    .brand .mk { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
+                 background: radial-gradient(circle at 50% 30%, #241f17, #121110); box-shadow: inset 0 0 0 1px rgba(201,170,108,.4); }
+    .brand .mk i { width: 13px; height: 13px; transform: rotate(45deg); border: 1.6px solid var(--gold-hi); border-radius: 3px; }
+    .dots { display: none; }
+    #menuBtn { order: 3; }
+    .round { width: 42px; height: 42px; }
+    .btn-sm { display: inline-flex; align-items: center; padding: 11px 18px; border-radius: 999px; font-weight: 500; font-size: 14px;
+              color: #1a140a; background: linear-gradient(180deg, #ecd7a4, #b8975a); box-shadow: inset 0 1px 0 rgba(255,255,255,.4); }
+
+    .pager { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 28px; height: auto; overflow: visible; align-items: start; }
+    .page, .page.away { height: auto; overflow: visible; padding: 0; opacity: 1; filter: none; }
+    #pNet { order: 1; } #pBanking { order: 2; }
+
+    .nw-card { position: relative; overflow: hidden; border-radius: 26px; padding: 30px 34px 24px; background: var(--card);
+               box-shadow: inset 0 0 0 1px var(--line); }
+    .nw-card::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(90deg, rgba(232,214,176,.03) 0 1px, transparent 1px 28px);
+      -webkit-mask: linear-gradient(180deg, #000, transparent 85%); mask: linear-gradient(180deg, #000, transparent 85%); }
+    #pNet .hero { text-align: left; padding: 0; }
+    #pNet .amount { font-size: 56px; }
+    #pNet .subline { justify-content: flex-start; }
+    .chart { height: 330px; margin: 22px -34px 10px; }
+    .ranges { justify-content: flex-start; gap: 6px; }
+    .note { text-align: left; }
+
+    .nw-foot { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 16px; }
+    .nw-foot .panel { margin-top: 0; }
+    .nw-foot .action { margin-top: 0; height: 100%; }
+    .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+
+    .bank-hero { text-align: left; padding: 24px 26px; border-radius: 22px; background: var(--card); box-shadow: inset 0 0 0 1px var(--line); }
+    .bank-hero .amount { font-size: 34px; }
+    .bank-hero .subline { justify-content: flex-start; }
+    #pBanking .section-head:first-of-type { margin-top: 24px; }
+
+    .scrim { position: fixed; }
+    .sheet { position: fixed; top: 0; bottom: 0; left: auto; width: 400px; max-height: none; border-radius: 0;
+             padding: 28px 22px; transform: translateX(105%); box-shadow: inset 1px 0 0 var(--line-2), -30px 0 80px rgba(0,0,0,.5); }
+    .sheet .grabber { display: none; }
+    .open .sheet { transform: none; }
+    .toast { bottom: 36px; }
+  }
+
   .fade-in { animation: fadeIn .6s ease both; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
@@ -265,10 +323,12 @@
       <button class="round" id="menuBtn" aria-label="Menu">
         <svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></svg>
       </button>
+      <div class="brand"><span class="mk"><i></i></span>Ledger</div>
       <div class="dots" role="tablist">
         <button class="on" data-page="0" aria-label="Banking"></button>
         <button data-page="1" aria-label="Net worth"></button>
       </div>
+      <button class="btn-sm" id="topConnect">Connect a bank</button>
       <button class="round" id="refreshBtn" aria-label="Refresh">
         <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9M4 5v4h4M4 13a8 8 0 0 0 14.3 4.9M20 19v-4h-4"/></svg>
       </button>
@@ -277,7 +337,7 @@
     <div class="pager" id="pager">
       <!-- Page 1: Banking -->
       <section class="page" id="pBanking">
-        <div class="hero">
+        <div class="hero bank-hero">
           <div class="eyebrow">Banking</div>
           <div class="amount" id="cashTotal">—</div>
           <div class="subline" id="cashSub"></div>
@@ -306,6 +366,7 @@
 
       <!-- Page 2: Net worth -->
       <section class="page away" id="pNet">
+        <div class="nw-card">
         <div class="hero">
           <div class="eyebrow" id="nwLabel">Net Worth</div>
           <div class="amount" id="nwTotal">—</div>
@@ -316,8 +377,12 @@
           <button data-r="7" class="on">1W</button><button data-r="30">1M</button><button data-r="90">3M</button>
           <button data-r="ytd">YTD</button><button data-r="365">1Y</button><button data-r="all">All</button>
         </div>
+        <div class="note hidden" id="nwNote"></div>
+        </div>
 
-        <div class="panel" style="margin-top:22px">
+        <div class="nw-foot">
+
+        <div class="panel">
           <div class="split">
             <div><div class="k">Assets</div><div class="v" id="assets">—</div></div>
             <div><div class="k">Liabilities</div><div class="v" id="liabs">—</div></div>
@@ -328,12 +393,15 @@
           <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Connect an account
           <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
         </button>
+        </div>
 
+        <div class="duo"><div>
         <div class="section-head"><h2>Cash flow</h2></div>
         <div id="cashflow" class="list"></div>
-
+        </div><div>
         <div class="section-head"><h2>Recurring</h2><span id="recurTotal" style="color:var(--gold);font-size:14px"></span></div>
         <div id="recurring" class="list"></div>
+        </div></div>
       </section>
     </div>
 
@@ -569,14 +637,19 @@ function renderNetWorth() {
     setHeader(now, null, state.series.length ? "History builds day by day" : "");
   }
   drawChart(pts);
+  const est = pts.filter((p) => p.estimated);
+  const note = $("nwNote");
+  note.classList.toggle("hidden", !est.length || pts.length < 2);
+  if (est.length) note.textContent = "Balances before " + short(addDays(est[est.length - 1].date, 1)) + " are estimated from your transaction history.";
 }
+function addDays(s, n) { const d = day(s); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
 
 document.querySelectorAll("#ranges button").forEach((b) => (b.onclick = () => {
   document.querySelectorAll("#ranges button").forEach((x) => x.classList.toggle("on", x === b));
   state.range = b.dataset.r; renderNetWorth();
 }));
 
-function drawChart(pts) {
+function drawChart(pts, animate = true) {
   const box = $("chart"); box.replaceChildren();
   if (pts.length < 2) {
     box.append(el("div", "empty-chart", state.series.length
@@ -584,7 +657,8 @@ function drawChart(pts) {
       : "Connect an account to start tracking net worth."));
     return;
   }
-  const W = box.clientWidth || 400, H = box.clientHeight || 210, padX = 0, padY = 26, endX = W * 0.62;
+  const wide = matchMedia("(min-width: 1100px)").matches;
+  const W = box.clientWidth || 400, H = box.clientHeight || 210, padX = wide ? 34 : 0, padY = 26, endX = W * (wide ? 0.93 : 0.62);
   const vals = pts.map((p) => p.netWorth), lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
   const t0 = day(pts[0].date).getTime(), t1 = day(pts[pts.length - 1].date).getTime(), tspan = t1 - t0 || 1;
   // Like the reference: the line ends ~60% across with a glowing tip, leaving room on the right.
@@ -609,13 +683,12 @@ function drawChart(pts) {
         <stop offset="1" stop-color="#f1dfb3" stop-opacity="0"/>
       </linearGradient>
       <radialGradient id="halo"><stop offset="0" stop-color="#f1dfb3" stop-opacity=".55"/><stop offset="1" stop-color="#c9aa6c" stop-opacity="0"/></radialGradient>
-      <radialGradient id="floor" cx=".5" cy="1" r=".8"><stop offset="0" stop-color="#9a7535" stop-opacity=".35"/><stop offset="1" stop-color="#9a7535" stop-opacity="0"/></radialGradient>
+      <radialGradient id="floor"><stop offset="0" stop-color="#9a7535" stop-opacity=".2"/><stop offset="1" stop-color="#9a7535" stop-opacity="0"/></radialGradient>
       <filter id="glow" x="-10%" y="-50%" width="120%" height="200%"><feGaussianBlur stdDeviation="3.5"/></filter>
-      <clipPath id="box"><rect width="${W}" height="${H}"/></clipPath>
     </defs>
-    <ellipse clip-path="url(#box)" cx="${lx}" cy="${H}" rx="${W * 0.38}" ry="${H * 0.6}" fill="url(#floor)"/>
-    <path d="${d}" fill="none" stroke="url(#stroke)" stroke-width="5" opacity=".35" filter="url(#glow)"/>
-    <path id="line" d="${d}" fill="none" stroke="url(#stroke)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <ellipse cx="${Math.min(lx, W - W * 0.22)}" cy="${H * 0.8}" rx="${W * 0.22}" ry="${H * 0.18}" fill="url(#floor)"/>
+    <path d="${d}" fill="none" stroke="url(#stroke)" stroke-width="4" opacity=".2" filter="url(#glow)"/>
+    <path id="line" d="${d}" fill="none" stroke="url(#stroke)" stroke-width="${wide ? 2 : 1.6}" stroke-linejoin="round" stroke-linecap="round"/>
     <g id="tip" transform="translate(${lx} ${ly})">
       <rect x="-.75" y="-36" width="1.5" height="72" fill="url(#flare)"/>
       <circle r="26" fill="url(#halo)"/>
@@ -629,7 +702,7 @@ function drawChart(pts) {
 
   // Draw-on animation
   const line = svg.querySelector("#line"), len = line.getTotalLength?.() || 0;
-  if (len && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  if (animate && len && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
     line.style.strokeDasharray = len; line.style.strokeDashoffset = len;
     line.getBoundingClientRect();
     line.style.transition = "stroke-dashoffset 1.1s cubic-bezier(.3,.7,.2,1)";
@@ -646,7 +719,7 @@ function drawChart(pts) {
     cl.setAttribute("x1", X(best)); cl.setAttribute("x2", X(best));
     cd.setAttribute("cx", X(best)); cd.setAttribute("cy", Y(best.netWorth));
     cursor.setAttribute("opacity", 1);
-    $("nwLabel").textContent = day(best.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    $("nwLabel").textContent = day(best.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + (best.estimated ? " · estimated" : "");
     setHeader(best.netWorth, { abs: best.netWorth - pts[0].netWorth, base: pts[0].netWorth }, "since " + short(pts[0].date));
   };
   const leave = () => { cursor.setAttribute("opacity", 0); $("nwLabel").textContent = "Net Worth"; renderNetWorthHeaderOnly(); };
@@ -660,7 +733,7 @@ function renderNetWorthHeaderOnly() {
 }
 
 let resizeT;
-addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => drawChart(rangeSeries()), 150); });
+addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => drawChart(rangeSeries(), false), 150); });
 
 // ---------- Transactions ----------
 function logoFor(t) {
@@ -763,6 +836,7 @@ async function openLink(itemId) {
 }
 $("addBtn").onclick = () => openLink();
 $("addBtn2").onclick = () => openLink();
+$("topConnect").onclick = () => openLink();
 $("sheetLink").onclick = () => { closeSheet(); openLink(); };
 
 showApp(!!token);
