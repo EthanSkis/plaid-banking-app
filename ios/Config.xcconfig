@@ -1,0 +1,6 @@
+// Shared settings. Personal values go in Local.xcconfig (gitignored).
+PRODUCT_BUNDLE_IDENTIFIER = com.example.plaidbank
+DEVELOPMENT_TEAM =
+API_HOST = your-backend.vercel.app
+
+#include? "Local.xcconfig"

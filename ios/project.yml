@@ -1,0 +1,40 @@
+# Generate the Xcode project with:  brew install xcodegen && xcodegen
+name: PlaidBank
+options:
+  deploymentTarget:
+    iOS: "17.0"
+configFiles:
+  Debug: Config.xcconfig
+  Release: Config.xcconfig
+packages:
+  LinkKit:
+    url: https://github.com/plaid/plaid-link-ios-spm
+    from: 6.5.8
+targets:
+  PlaidBank:
+    type: application
+    platform: iOS
+    sources: [PlaidBank]
+    dependencies:
+      - package: LinkKit
+    info:
+      path: PlaidBank/Info.plist
+      properties:
+        CFBundleDisplayName: Ledger
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        API_HOST: $(API_HOST)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        ITSAppUsesNonExemptEncryption: false
+    entitlements:
+      path: PlaidBank/PlaidBank.entitlements
+      properties:
+        com.apple.developer.applesignin: [Default]
+    settings:
+      base:
+        SWIFT_VERSION: "5.0"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1"

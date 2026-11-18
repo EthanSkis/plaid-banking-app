@@ -1,0 +1,7 @@
+Local.xcconfig
+*.xcodeproj
+xcuserdata/
+DerivedData/
+.build/
+PlaidBank/Info.plist
+PlaidBank/PlaidBank.entitlements
