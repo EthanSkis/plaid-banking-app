@@ -422,6 +422,35 @@
   input:focus-visible { outline: none; }   /* inputs already show a gold hairline on focus */
   .login p { text-wrap: balance; }
 
+  /* ---------- Activity panel: full screen on phones, a centered window on desktop ---------- */
+  .act-scrim { position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, .6); opacity: 0; pointer-events: none;
+               transition: opacity 200ms var(--ease); }
+  .act { position: fixed; z-index: 31; inset: 0; display: flex; flex-direction: column; background: var(--bg);
+         opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(12px);
+         transition: opacity 300ms var(--ease), transform 300ms var(--ease), visibility 0s linear 300ms; }
+  .act-open .act { opacity: 1; visibility: visible; pointer-events: auto; transform: none;
+                   transition: opacity 300ms var(--ease), transform 300ms var(--ease); }
+  .act-open .act-scrim { opacity: 1; pointer-events: auto; }
+  body.act-open { overflow: hidden; }
+  .act-head { display: flex; align-items: center; justify-content: space-between; padding: max(16px, env(safe-area-inset-top)) 16px 12px; }
+  .act-head h2 { margin: 0; font-size: 20px; font-weight: 500; }
+  .act .search { width: auto; margin: 0 16px 4px; }
+  .act-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px max(24px, env(safe-area-inset-bottom)); }
+  .day { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; padding: 20px 4px 8px;
+         background: var(--bg); color: var(--text-2); font-size: 13px; }
+  .day .tot { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .act-end { min-height: 48px; padding: 16px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  @media (min-width: 960px) {
+    .act { inset: auto; top: 50%; left: 50%; width: min(720px, calc(100vw - 64px)); height: min(820px, calc(100vh - 64px));
+           transform: translate(-50%, calc(-50% + 12px)); border-radius: 20px;
+           box-shadow: inset 0 0 0 1px var(--line-2), 0 24px 64px rgba(0, 0, 0, .5); }
+    .act-open .act { transform: translate(-50%, -50%); }
+    .act-head { padding: 24px 24px 12px; }
+    .act .search { margin: 0 24px 4px; }
+    .act-body { padding: 0 24px 24px; }
+  }
+
   @media (min-width: 960px) {
     .shell { max-width: 1440px; padding: 0 32px 64px; }
     .page, .page.away { padding: 0; }
@@ -496,10 +525,8 @@
           <div id="otherAccounts"></div>
         </div>
 
-        <div class="section-head"><h2>Activity</h2></div>
-        <input id="search" class="search" type="search" placeholder="Search transactions">
-        <div id="txns" class="list"></div>
-        <button id="moreBtn" class="more hidden">Load more</button>
+        <div class="section-head"><h2>Activity</h2><button class="link" id="seeAll">See all</button></div>
+        <div id="recent" class="list"></div>
       </section>
 
       <!-- Page 2: Net worth -->
@@ -542,6 +569,21 @@
         </div></div>
       </section>
     </div>
+
+    <div class="act-scrim" id="actScrim"></div>
+    <section class="act" id="act" role="dialog" aria-modal="true" aria-labelledby="actTitle">
+      <header class="act-head">
+        <h2 id="actTitle">Activity</h2>
+        <button class="round" id="actClose" aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <input id="search" class="search" type="search" placeholder="Search" aria-label="Search transactions">
+      <div class="act-body" id="actBody">
+        <div id="txns"></div>
+        <div id="txEnd" class="act-end"></div>
+      </div>
+    </section>
 
     <div class="scrim" id="scrim"></div>
     <div class="sheet" id="sheet">
@@ -617,7 +659,8 @@ pager.addEventListener("scroll", () => {
   pages.forEach((p, j) => p.classList.toggle("away", i !== j));
 }, { passive: true });
 document.addEventListener("keydown", (e) => {
-  if (e.target.tagName === "INPUT") return;
+  if (e.key === "Escape" && document.body.classList.contains("act-open")) return closeActivity();
+  if (e.target.tagName === "INPUT" || document.body.classList.contains("act-open")) return;
   if (e.key === "ArrowRight") setPage(1);
   if (e.key === "ArrowLeft") setPage(0);
 });
@@ -630,7 +673,10 @@ $("scrim").onclick = closeSheet;
 
 // ---------- Data ----------
 async function loadAll() {
-  const results = await Promise.allSettled([loadAccounts(), loadNetWorth(), loadTxns(true), loadCashflow(), loadRecurring()]);
+  state.txLoaded = false;
+  const jobs = [loadAccounts(), loadNetWorth(), loadRecent(), loadCashflow(), loadRecurring()];
+  if (document.body.classList.contains("act-open")) jobs.push(loadTxns(true));
+  const results = await Promise.allSettled(jobs);
   const failed = results.find((r) => r.status === "rejected");
   if (failed) toast(failed.reason.message);
 }
@@ -882,27 +928,92 @@ function logoFor(t) {
   return box;
 }
 
-async function loadTxns(reset) {
-  if (reset) { state.txCursor = null; $("txns").replaceChildren(); }
-  const p = new URLSearchParams({ limit: "40" });
-  if (state.txCursor) p.set("cursor", state.txCursor);
-  const q = $("search").value.trim(); if (q) p.set("q", q);
-  const { transactions, nextCursor } = await api("GET", "/api/transactions?" + p);
-  for (const t of transactions) {
-    const amt = -t.amount;
-    const r = el("div", "row"); const l = el("div", "l");
-    l.append(el("div", "t", t.merchantName || t.name),
-             el("div", "s", [short(t.date), t.accountName, t.pending && "Pending"].filter(Boolean).join(" · ")));
-    r.append(logoFor(t), l, el("div", "r" + (amt > 0 ? " in" : ""), (amt > 0 ? "+" : "") + usd(amt)));
-    $("txns").append(r);
-  }
-  if (reset && !transactions.length) $("txns").append(el("div", "empty", q ? "No matches" : "No transactions yet"));
-  state.txCursor = nextCursor;
-  $("moreBtn").classList.toggle("hidden", !nextCursor);
+function txnRow(t) {
+  const amt = -t.amount; // Plaid: positive = money out
+  const r = el("div", "row"), l = el("div", "l");
+  l.append(el("div", "t", t.merchantName || t.name),
+           el("div", "s", [t.accountName, t.pending && "Pending"].filter(Boolean).join(" · ")));
+  r.append(logoFor(t), l, el("div", "r" + (amt > 0 ? " in" : ""), (amt > 0 ? "+" : "") + usd(amt)));
+  return r;
 }
-$("moreBtn").onclick = () => loadTxns(false).catch((e) => toast(e.message));
+
+function dayLabel(s) {
+  const d = day(s), today = new Date(); today.setHours(12, 0, 0, 0);
+  const diff = Math.round((today - d) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric",
+                                         ...(d.getFullYear() !== today.getFullYear() && { year: "numeric" }) });
+}
+
+// Inline: just the latest few, so the page stays short
+async function loadRecent() {
+  const { transactions } = await api("GET", "/api/transactions?limit=8");
+  const box = $("recent"); box.replaceChildren();
+  for (const t of transactions) {
+    const r = txnRow(t);
+    r.querySelector(".s").textContent = [short(t.date), t.accountName, t.pending && "Pending"].filter(Boolean).join(" · ");
+    box.append(r);
+  }
+  if (!transactions.length) box.append(el("div", "empty", "No transactions yet"));
+  $("seeAll").classList.toggle("hidden", !transactions.length);
+}
+
+// Full history: grouped by day, loads more as you scroll inside the panel
+let txGen = 0, txBusy = false, lastGroup = null;
+async function loadTxns(reset) {
+  if (reset) { txGen++; state.txCursor = null; lastGroup = null; $("txns").replaceChildren(); $("actBody").scrollTop = 0; }
+  else if (txBusy || !state.txCursor) return;
+  const gen = txGen; txBusy = true; $("txEnd").textContent = "Loading";
+  try {
+    const p = new URLSearchParams({ limit: "50" });
+    if (state.txCursor) p.set("cursor", state.txCursor);
+    const q = $("search").value.trim(); if (q) p.set("q", q);
+    const { transactions, nextCursor } = await api("GET", "/api/transactions?" + p);
+    if (gen !== txGen) return; // search changed while this page was loading
+    for (const t of transactions) {
+      if (!lastGroup || lastGroup.date !== t.date) {
+        const head = el("div", "day"), tot = el("span", "tot");
+        head.append(el("span", "", dayLabel(t.date)), tot);
+        const list = el("div", "list");
+        $("txns").append(head, list);
+        lastGroup = { date: t.date, list, tot, net: 0 };
+      }
+      lastGroup.list.append(txnRow(t));
+      lastGroup.net += -t.amount;
+      lastGroup.tot.textContent = (lastGroup.net > 0 ? "+" : "") + usd(lastGroup.net);
+    }
+    state.txCursor = nextCursor; state.txLoaded = true;
+    $("txEnd").textContent = !$("txns").children.length ? (q ? "No matches" : "No transactions yet") : nextCursor ? "" : "No earlier transactions";
+  } finally { if (gen === txGen) txBusy = false; }
+  // Keep filling until the panel can scroll (tall screens)
+  const body = $("actBody");
+  if (gen === txGen && state.txCursor && body.scrollHeight <= body.clientHeight + 200) loadTxns(false);
+}
+
+new IntersectionObserver((entries) => {
+  if (entries[0].isIntersecting && document.body.classList.contains("act-open")) loadTxns(false).catch((e) => toast(e.message));
+}, { root: $("actBody"), rootMargin: "400px" }).observe($("txEnd"));
+
 let searchT;
-$("search").addEventListener("input", () => { clearTimeout(searchT); searchT = setTimeout(() => loadTxns(true).catch((e) => toast(e.message)), 300); });
+$("search").addEventListener("input", () => {
+  clearTimeout(searchT);
+  searchT = setTimeout(() => loadTxns(true).catch((e) => toast(e.message)), 300);
+});
+
+function openActivity() {
+  document.body.classList.add("act-open");
+  if (!state.txLoaded) loadTxns(true).catch((e) => toast(e.message));
+  if (matchMedia("(min-width: 960px)").matches) setTimeout(() => $("search").focus(), 50);
+  else $("actClose").focus();
+}
+function closeActivity() {
+  document.body.classList.remove("act-open");
+  $("seeAll").focus();
+}
+$("seeAll").onclick = openActivity;
+$("actClose").onclick = closeActivity;
+$("actScrim").onclick = closeActivity;
 
 // ---------- Cash flow & recurring ----------
 function monthLabel(ym) {
