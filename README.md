@@ -42,7 +42,7 @@ See `backend/.env.example`. Generate the three secrets with `openssl rand -base6
 | `ENCRYPTION_KEY` | 32 random bytes, base64. **Back this up.** Lose it and every bank must be relinked. |
 | `SESSION_SECRET` | random |
 | `CRON_SECRET` | random (Vercel uses it to authenticate the daily cron) |
-| `APPLE_BUNDLE_ID` | your iOS bundle id, e.g. `com.yourname.plaidbank` |
+| `APPLE_BUNDLE_ID` | your iOS bundle id, e.g. `com.ethanskis.plaidbank` |
 
 Redeploy after setting them.
 
