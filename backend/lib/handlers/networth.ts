@@ -1,7 +1,7 @@
-import { route, json } from "../../lib/http.js";
-import { requireUser } from "../../lib/auth.js";
-import { q } from "../../lib/db.js";
-import { netWorthSeries, type Snapshot } from "../../lib/networth.js";
+import { route, json } from "../http.js";
+import { requireUser } from "../auth.js";
+import { q } from "../db.js";
+import { netWorthSeries, type Snapshot } from "../networth.js";
 
 // GET ?days=365 -> daily net worth series (starts the day you first linked a bank)
 export const GET = route(async (req) => {

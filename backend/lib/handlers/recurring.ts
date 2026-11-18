@@ -1,7 +1,7 @@
-import { route, json } from "../../lib/http.js";
-import { requireUser } from "../../lib/auth.js";
-import { q } from "../../lib/db.js";
-import { detectRecurring, type Tx } from "../../lib/recurring.js";
+import { route, json } from "../http.js";
+import { requireUser } from "../auth.js";
+import { q } from "../db.js";
+import { detectRecurring, type Tx } from "../recurring.js";
 
 // GET -> detected subscriptions / recurring charges
 export const GET = route(async (req) => {

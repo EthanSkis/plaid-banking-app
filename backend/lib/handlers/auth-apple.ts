@@ -1,6 +1,6 @@
-import { route, json, body, HttpError } from "../../lib/http.js";
-import { verifyAppleToken, issueSession } from "../../lib/auth.js";
-import { q } from "../../lib/db.js";
+import { route, json, body, HttpError } from "../http.js";
+import { verifyAppleToken, issueSession } from "../auth.js";
+import { q } from "../db.js";
 
 // POST { identityToken } -> { token }
 export const POST = route(async (req) => {

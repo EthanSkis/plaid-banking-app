@@ -1,6 +1,6 @@
-import { route, json } from "../../lib/http.js";
-import { requireUser } from "../../lib/auth.js";
-import { q } from "../../lib/db.js";
+import { route, json } from "../http.js";
+import { requireUser } from "../auth.js";
+import { q } from "../db.js";
 
 // GET ?months=12 -> monthly income vs spending, plus top spending categories for the current month.
 // Transfers and credit card payments are excluded, otherwise paying your card counts as spending twice.
