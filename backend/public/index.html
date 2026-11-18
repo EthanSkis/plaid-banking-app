@@ -514,6 +514,38 @@
   }
   @media (prefers-reduced-motion: reduce) and (max-width: 959px) { .act, .act-open .act { transform: none; } }
   @media (prefers-reduced-motion: reduce) and (min-width: 960px) { .act, .act-open .act { transform: translate(-50%, -50%); } }
+
+  /* ===================== Desktop: every column ends on the same line ===================== */
+  .row.foot { display: none; }
+  /* Summary line pinned to the bottom of Cash flow and Recurring */
+  .list-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: auto; padding: 12px 16px;
+               border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  .list-foot b { font-weight: 400; color: var(--text-2); }
+  .row.cut { display: none; }
+  @media (min-width: 960px) {
+    .pager { align-items: stretch; }
+    #pNet, #pBanking { display: flex; flex-direction: column; }
+    /* Cash flow and Recurring share a height, and together absorb any extra height on the left */
+    #pNet .duo { flex: 1; align-items: stretch; }
+    #pNet .duo > div { display: flex; flex-direction: column; }
+    #pNet .duo .list { flex: 1; }
+    /* Right column: sized by the left one (contain: size), Activity fills what's left with whole rows */
+    #pBanking.fit { contain: size; }
+    /* Accounts take what they need; with many accounts they scroll inside their own area */
+    .accts { flex: 0 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--raised) transparent; }
+    .accts.more-below { -webkit-mask: linear-gradient(#000 calc(100% - 56px), transparent);
+                                mask: linear-gradient(#000 calc(100% - 56px), transparent); }
+    /* Activity takes the rest, in whole rows */
+    .act-sec { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+    #pNet .duo .list { display: flex; flex-direction: column; }
+    #recent { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    #pBanking:not(.fit) #recent { flex: 1 0 auto; }
+    #seeAll { display: none; }
+    .row.foot { display: flex; justify-content: center; gap: 8px; margin-top: auto; width: 100%; color: var(--text-2); font-size: 14px;
+                transition: background-color 150ms var(--ease), color 150ms var(--ease); }
+    .row.foot:hover { background: var(--raised); color: var(--text); }
+    .row.foot svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; }
+  }
 </style>
 </head>
 <body>
@@ -555,6 +587,7 @@
           <div class="subline" id="cashSub"></div>
         </div>
 
+        <div class="accts" id="accts">
         <div class="section-head"><h2>Accounts</h2>
           <button class="link" id="addBtn"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add</button>
         </div>
@@ -569,9 +602,12 @@
           <div class="section-head"><h2>Investments &amp; loans</h2></div>
           <div id="otherAccounts"></div>
         </div>
+        </div>
 
+        <div class="act-sec" id="actSec">
         <div class="section-head"><h2>Activity</h2><button class="link" id="seeAll">See all</button></div>
         <div id="recent" class="list"></div>
+        </div>
       </section>
 
       <!-- Page 2: Net worth -->
@@ -758,6 +794,7 @@ async function loadAll() {
   const jobs = [loadAccounts(), loadNetWorth(), loadRecent(), loadCashflow(), loadRecurring()];
   if (document.body.classList.contains("act-open")) jobs.push(loadTxns(true));
   const results = await Promise.allSettled(jobs);
+  fitColumns();   // every section has its final height now
   const failed = results.find((r) => r.status === "rejected");
   if (failed) toast(failed.reason.message);
 }
@@ -1043,7 +1080,7 @@ function dayLabel(s) {
 
 // Inline: just the latest few, so the page stays short
 async function loadRecent() {
-  const { transactions } = await api("GET", "/api/transactions?limit=8");
+  const { transactions } = await api("GET", "/api/transactions?limit=20");   // desktop shows as many as fit, phones show 8
   const box = $("recent"); box.replaceChildren();
   for (const t of transactions) {
     const r = txnRow(t);
@@ -1051,8 +1088,54 @@ async function loadRecent() {
     box.append(r);
   }
   if (!transactions.length) box.append(el("div", "empty", "No transactions yet"));
+  else {
+    const foot = el("button", "row foot", "See all transactions");
+    foot.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>');
+    foot.onclick = openActivity;
+    box.append(foot);
+  }
   $("seeAll").classList.toggle("hidden", !transactions.length);
+  fitColumns();
 }
+
+// Desktop: the left column sets the height, Activity shows the whole rows that fit (at least 3).
+// If even that is taller than the left column, flip it: the right column sets the height and
+// Cash flow / Recurring stretch to meet it. Phones just show the latest 8.
+const MIN_ROWS = 3, PHONE_ROWS = 8;
+function fitColumns() {
+  const right = $("pBanking"), list = $("recent"), accts = $("accts"), sec = $("actSec");
+  const rows = [...list.querySelectorAll(".row:not(.foot)")];
+  rows.forEach((r) => r.classList.remove("cut"));
+  right.classList.remove("fit"); accts.classList.remove("more-below");
+  accts.style.minHeight = ""; sec.style.minHeight = "";
+  if (!wideMQ.matches) { rows.slice(PHONE_ROWS).forEach((r) => r.classList.add("cut")); return; }
+
+  // Floors: Activity keeps its header + 3 rows + footer, Accounts keep about two cards visible
+  const head = sec.querySelector(".section-head"), foot = list.querySelector(".foot");
+  const hs = getComputedStyle(head);
+  const headH = head.offsetHeight + parseFloat(hs.marginTop) + parseFloat(hs.marginBottom);
+  const rowH = rows[0]?.offsetHeight || 0;
+  sec.style.minHeight = Math.ceil(headH + rowH * Math.min(MIN_ROWS, rows.length) + (foot?.offsetHeight || 0) + 2) + "px";
+  accts.style.minHeight = Math.min(accts.scrollHeight, 300) + "px";
+
+  right.classList.add("fit");   // the left column now sets the height
+  if (rows.length) {
+    const limit = list.getBoundingClientRect().bottom - (foot?.offsetHeight || 0) + 0.5;
+    const firstOut = rows.findIndex((r) => r.getBoundingClientRect().bottom > limit);
+    if (firstOut !== -1) rows.slice(Math.max(firstOut, MIN_ROWS)).forEach((r) => r.classList.add("cut"));
+  }
+  updateAcctsFade();
+  if (right.scrollHeight > right.clientHeight + 1) right.classList.remove("fit");   // left column is too short even for the floors
+}
+function updateAcctsFade() {
+  const a = $("accts");
+  a.classList.toggle("more-below", wideMQ.matches && a.scrollTop + a.clientHeight < a.scrollHeight - 1);
+}
+$("accts").addEventListener("scroll", updateAcctsFade, { passive: true });
+let fitT;
+addEventListener("resize", () => { clearTimeout(fitT); fitT = setTimeout(fitColumns, 100); });
+wideMQ.addEventListener("change", fitColumns);
+document.fonts?.ready.then(fitColumns);
 
 // Full history: grouped by day, loads more as you scroll inside the panel
 let txGen = 0, txBusy = false, lastGroup = null;
@@ -1135,6 +1218,11 @@ async function loadCashflow() {
     wrap.append(row);
   }
   box.append(wrap);
+  const net = monthly.reduce((sum, m) => sum + m.income - m.spending, 0);
+  const foot = el("div", "list-foot");
+  foot.append(el("span", "", `Net over ${monthly.length} month${monthly.length === 1 ? "" : "s"}`),
+              el("b", "", (net >= 0 ? "+" : "−") + usd(Math.abs(net))));
+  box.append(foot);
 }
 
 async function loadRecurring() {
@@ -1148,7 +1236,11 @@ async function loadRecurring() {
     row.append(logoFor({ name: r.name }), l, el("div", "r", usd(r.lastAmount)));
     box.append(row);
   }
-  if (!recurring.length) box.append(el("div", "empty", "Nothing recurring detected yet"));
+  if (!recurring.length) { box.append(el("div", "empty", "Nothing recurring detected yet")); return; }
+  const active = recurring.filter((r) => r.active).length;
+  const foot = el("div", "list-foot");
+  foot.append(el("span", "", `${active} active`), el("b", "", usd(monthlyTotal * 12) + " a year"));
+  box.append(foot);
 }
 
 // ---------- Actions ----------
